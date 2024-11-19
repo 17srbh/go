@@ -1,0 +1,44 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"sync"
+)
+
+type Book struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Author string `json:"author"`
+}
+
+var (
+	books = []Book{}
+	mu    sync.Mutex
+)
+
+func getBooks(w http.ResponseWriter, r *http.Request) {
+	mu.Lock()
+	defer mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(books)
+}
+
+func addBook(w http.ResponseWriter, r *http.Request) {
+	mu.Lock()
+	defer mu.Unlock()
+	var book Book
+	if err := json.NewDecoder(r.Body).Decode(&book); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	books = append(books, book)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(book)
+}
+
+func main() {
+	http.HandleFunc("/books", getBooks)
+	http.HandleFunc("/books/add", addBook)
+	http.ListenAndServe(":8080", nil)
+}
